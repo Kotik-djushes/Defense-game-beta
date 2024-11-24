@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Defense Game</title>
+<style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: Arial, sans-serif;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background-color: #222;
+    color: #fff;
+    height: 100vh;
+    justify-content: center;
+}
+
+h1 {
+    margin-bottom: 10px;
+    font-size: 24px;
+}
+
+#status {
+    margin-bottom: 20px;
+    font-size: 18px;
+    font-weight: bold;
+}
+
+#game-board {
+    display: grid;
+    grid-template-columns: repeat(7, 50px);
+    gap: 5px;
+    background-color: #333;
+    padding: 10px;
+    border-radius: 8px;
+}
+
+.cell {
+    width: 50px;
+    height: 50px;
+    background-color: #555;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: bold;
+    color: #fff;
+    position: relative;
+}
+
+.cell::after {
+    content: attr(data-id);
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.5);
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+}
+
+.base {
+    background-color: #3498db;
+}
+
+.enemy {
+    background-color: #e74c3c;
+}
+
+.generator {
+    background-color: #f39c12;
+}
+
+.wall {
+    background-color: #2ecc71;
+}
+
+.spikeWall {
+    background-color: #7f7f7f; /* Серый цвет для шипов */
+    position: relative;
+}
+
+.spikeWall::before {
+    content: '';
+    position: absolute;
+    top: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-left: 10px solid transparent;
+    border-right: 10px solid transparent;
+    border-bottom: 10px solid #7f7f7f; /* Серый цвет шипа */
+}
+
+.control-button {
+    padding: 10px;
+    margin: 5px;
+    background-color: #444;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+</style>
+</head>
+<body>
+
+<h1>DEFENSE GAME</h1>
+<p id="status">HP: 30 | Build Points: 50</p>
+
+<div id="game-board"></div>
+
+<div id="controls" align="center">
+    <button class="control-button" onclick="buildStructure('generator')">Build Generator (10 pts)</button>
+    <button class="control-button" onclick="buildStructure('wall')">Build Wall (5 pts)</button>
+    <button class="control-button" onclick="buildStructure('spikeWall')">Build Spike Wall (10 pts)</button><br>
+    <button class="control-button" onclick="destroyStructure()">Destroy Structure</button>
+</div>
+
+<script>
+const gridSize = 7;
+const gameBoard = document.getElementById('game-board');
+let baseHP = 30;
+let buildPoints = 50;
+let structures = {};
+let enemies = [];
+let enemyDamage = 2;
+let enemySpawnInterval;
+let pointGenerationInterval;
+
+// Создание игрового поля
+for (let i = 0; i < gridSize * 7; i++) {
+    const cell = document.createElement('div');
+    cell.classList.add('cell');
+    cell.id = `cell-${i}`;
+    cell.setAttribute("data-id", i);
+    if (i === (gridSize * 6) + Math.floor(gridSize / 2)) {
+        cell.classList.add('base');
+        cell.innerText = 'BASE';
+    }
+    gameBoard.appendChild(cell);
+}
+
+// Функция для постройки структуры
+function buildStructure(type) {
+    let cost, hp;
+
+    if (type === 'spikeWall') {
+        cost = 10;
+        hp = 50;
+    } else if (type === 'generator') {
+        cost = 10;
+        hp = 30;
+    } else if (type === 'wall') {
+        cost = 5;
+        hp = 50;
+    }
+
+    let index = prompt(`Enter cell number (0-${gridSize * 7 - 1}) to place ${type} or type 'cancel' to cancel:`);
+
+    if (index === 'cancel') {
+        return; // Отмена постройки, очки не тратятся
+    }
+
+    if (buildPoints >= cost) {
+        if (!structures[index] && index != (gridSize * 6) + Math.floor(gridSize / 2)) {
+            structures[index] = { type, hp: hp || 30 };
+            buildPoints -= cost; // Уменьшаем очки только если структура успешно построена
+            const cell = document.getElementById(`cell-${index}`);
+            cell.classList.add(type);
+            cell.innerText = type.charAt(0).toUpperCase() + type.slice(1);
+            updateStatus();
+        } else {
+            alert('Invalid cell or already occupied!');
+        }
+    } else {
+        alert('Not enough points!');
+    }
+}
+
+// Обновление статуса
+function updateStatus() {
+    document.getElementById('status').innerText = `HP: ${baseHP} | Build Points: ${buildPoints}`;
+}
+
+// Уничтожение структуры
+function destroyStructure() {
+    let index = prompt(`Enter cell number (0-${gridSize * 7 - 1}) to destroy structure:`);
+    if (structures[index]) {
+        const cell = document.getElementById(`cell-${index}`);
+        delete structures[index];
+        cell.className = 'cell';
+        cell.innerText = '';
+        updateStatus();
+    } else {
+        alert('No structure to destroy in this cell!');
+    }
+}
+
+// Спавн врага
+function spawnEnemy() {
+    let spawnPosition = Math.floor(Math.random() * gridSize);
+    if (!structures[spawnPosition]) {
+        enemies.push({ position: spawnPosition, hp: 3 });
+        document.getElementById(`cell-${spawnPosition}`).classList.add('enemy');
+        document.getElementById(`cell-${spawnPosition}`).innerText = 'Enemy';
+    }
+}
+
+// Движение врагов
+function moveEnemies() {
+    for (let i = enemies.length - 1; i >= 0; i--) {
+        let enemy = enemies[i];
+        let currentCell = enemy.position;
+        let nextCell = currentCell + gridSize;
+
+        if (nextCell < gridSize * 7) {
+            const nextCellElement = document.getElementById(`cell-${nextCell}`);
+            const currentCellElement = document.getElementById(`cell-${currentCell}`);
+
+            if (!structures[nextCell]) {
+                currentCellElement.classList.remove('enemy');
+                currentCellElement.innerText = '';
+                enemy.position = nextCell;
+                nextCellElement.classList.add('enemy');
+                nextCellElement.innerText = 'Enemy';
+            } else {
+                enemies.splice(i, 1); // Удаляем врага, если он сталкивается с блоком
+            }
+        } else {
+            enemies.splice(i, 1);
+        }
+    }
+}
+
+// Генерация очков
+function generatePoints() {
+    buildPoints += 2; // Добавляем 2 очка каждую 2 секунды
+    updateStatus();
+}
+
+// Генерация очков от генератора
+function generatePointsFromGenerator() {
+    for (let index in structures) {
+        if (structures[index].type === 'generator') {
+            buildPoints += 3; // Добавляем 3 очка от генератора
+            updateStatus();
+        }
+    }
+}
+
+// Запуск игры
+function startGame() {
+    enemySpawnInterval = setInterval(() => {
+        spawnEnemy();
+        moveEnemies();
+        updateStatus();
+        if (baseHP <= 0) {
+            alert('Game Over!');
+            clearInterval(enemySpawnInterval);
+            clearInterval(pointGenerationInterval); // Остановить генерацию очков при окончании игры
+        }
+    }, 5000); // 5 секунд для спавна врагов
+
+    pointGenerationInterval = setInterval(() => {
+        generatePoints(); // Генерация очков каждые 2 секунды
+        generatePointsFromGenerator(); // Генерация очков от генераторов
+    }, 2000); // Генерация очков каждые 2 секунды
+}
+
+startGame();
+</script>
+
+</body>
+</html>
